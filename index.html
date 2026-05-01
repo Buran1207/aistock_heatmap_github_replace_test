@@ -213,7 +213,39 @@ function toYfSym(t,m){
   if(String(t).startsWith('8')||String(t).startsWith('4')) return `${t}.BJ`;
   return `${t}.SZ`;
 }
-function stockUrl(s){return `https://finance.yahoo.com/quote/${encodeURIComponent(toYfSym(s.t,s.m))}`}
+const TV_US_EXCHANGE={
+  NEE:'NYSE',AEP:'NASDAQ',DUK:'NYSE',CEG:'NASDAQ',SO:'NYSE',EXC:'NASDAQ',VST:'NYSE',TLN:'NASDAQ',
+  ETN:'NYSE',VRT:'NYSE',HUBB:'NYSE',GEV:'NYSE',PWR:'NYSE',GNRC:'NYSE',JCI:'NYSE',CMI:'NYSE',
+  NVDA:'NASDAQ',AMD:'NASDAQ',AVGO:'NASDAQ',INTC:'NASDAQ',MRVL:'NASDAQ',ARM:'NASDAQ',ASML:'NASDAQ',QCOM:'NASDAQ',AMAT:'NASDAQ',LRCX:'NASDAQ',KLAC:'NASDAQ',
+  MU:'NASDAQ',WDC:'NASDAQ',STX:'NASDAQ',STM:'NYSE',NXPI:'NASDAQ',
+  TSM:'NYSE',ASX:'NYSE',AMKR:'NASDAQ',ONTO:'NYSE',TER:'NASDAQ',AEHR:'NASDAQ',TTM:'NASDAQ',JBL:'NYSE',FLEX:'NASDAQ',SANM:'NASDAQ',
+  SMCI:'NASDAQ',DELL:'NYSE',HPE:'NYSE',IBM:'NYSE',NTAP:'NASDAQ',
+  MOD:'NYSE',CARR:'NYSE',TT:'NYSE',IR:'NYSE',
+  ANET:'NYSE',CSCO:'NASDAQ',JNPR:'NYSE',CIEN:'NYSE',NOK:'NYSE',COHR:'NYSE',LITE:'NASDAQ',IPGP:'NASDAQ',
+  EQIX:'NASDAQ',DLR:'NYSE',GDS:'NASDAQ',VNET:'NASDAQ',IRM:'NYSE',AMT:'NYSE',CCI:'NYSE',
+  MSFT:'NASDAQ',GOOGL:'NASDAQ',META:'NASDAQ',AMZN:'NASDAQ',ORCL:'NYSE',PLTR:'NASDAQ',AI:'NYSE',SNOW:'NYSE',MDB:'NASDAQ',DDOG:'NASDAQ',NET:'NYSE',AKAM:'NASDAQ',
+  BIDU:'NASDAQ',BABA:'NYSE',JD:'NASDAQ',PDD:'NASDAQ',NTES:'NASDAQ',TME:'NYSE',
+  CRM:'NYSE',NOW:'NYSE',VEEV:'NYSE',ADBE:'NASDAQ',INTU:'NASDAQ',ADSK:'NASDAQ',PATH:'NYSE',SOUN:'NASDAQ',
+  AAPL:'NASDAQ',HPQ:'NYSE',MBLY:'NASDAQ',TSLA:'NASDAQ',AMBA:'NASDAQ',MVIS:'NASDAQ',CGNX:'NASDAQ',INVZ:'NASDAQ',HSAI:'NASDAQ',OUST:'NYSE',LAZR:'NASDAQ',AEVA:'NASDAQ',
+  MCHP:'NASDAQ',TXN:'NASDAQ',ADI:'NASDAQ',ON:'NASDAQ',HON:'NASDAQ',TEL:'NYSE',ROK:'NYSE',AME:'NYSE',SYM:'NASDAQ',IEX:'NYSE',PH:'NYSE',ITW:'NYSE',DOV:'NYSE',EMR:'NYSE',ITT:'NYSE',FLS:'NYSE',XYL:'NYSE',
+  CDNS:'NASDAQ',SNPS:'NASDAQ',PTC:'NASDAQ',U:'NYSE',RBLX:'NYSE',
+  HXL:'NYSE',ATI:'NYSE',CRS:'NYSE',MP:'NYSE',LAC:'NYSE',ALB:'NYSE',QS:'NYSE',ENVX:'NASDAQ',FREY:'NYSE',MMM:'NYSE',GLW:'NYSE',DOW:'NYSE',DD:'NYSE'
+};
+function tvTicker(t,m){
+  const raw=String(t).trim().toUpperCase();
+  if(m==='H') return String(Number(raw));
+  return raw;
+}
+function tvExchange(t,m){
+  const raw=String(t).trim().toUpperCase();
+  if(m==='US') return TV_US_EXCHANGE[raw]||'NASDAQ';
+  if(m==='H') return 'HKEX';
+  if(/^6/.test(raw)||/^688/.test(raw)) return 'SSE';
+  if(/^8|^4/.test(raw)) return 'BSE';
+  return 'SZSE';
+}
+function tvSymbol(s){return `${tvExchange(s.t,s.m)}:${tvTicker(s.t,s.m)}`}
+function stockUrl(s){return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(s))}`}
 
 function heatVars(chg){
   if(!isNum(chg)) return '';
@@ -282,7 +314,7 @@ function sortedStocks(arr){
 function chip(s){
   const d=dataOf(s), ch=d?.change, has=isNum(ch);
   const cls=['chip',has?'':'no-data',d?.stale?'stale':''].filter(Boolean).join(' ');
-  const title=`${s.n} ${s.m}:${s.t}\n价格：${price(d?.price)} ${d?.currency||''}\n涨跌：${pct(ch)}${d?.stale?'\n使用上一轮有效行情':''}`;
+  const title=`${s.n} ${s.m}:${s.t} → TradingView ${tvSymbol(s)}\n价格：${price(d?.price)} ${d?.currency||''}\n涨跌：${pct(ch)}${d?.stale?'\n使用上一轮有效行情':''}`;
   return `<a class="${cls}" style="${heatVars(ch)}" href="${stockUrl(s)}" target="_blank" rel="noopener" title="${title}">
     <span class="chip-main"><b class="ticker">${s.t}</b><span class="name">${s.n}</span></span>
     <span class="price">${price(d?.price)}</span>
