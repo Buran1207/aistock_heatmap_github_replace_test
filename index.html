@@ -200,43 +200,51 @@ const MARKET_NAME={US:'US',H:'H',A:'A'};
 let C=[], P={}, activeMarkets=new Set(MARKET_ORDER), query='', refreshTimer=null;
 
 function qs(id){return document.getElementById(id)}
+function normMarket(m){return String(m||'').toUpperCase()==='HK'?'H':String(m||'').toUpperCase()}
 function normTicker(t,m){
-  const raw=String(t).trim();
-  if(m==='US') return raw.toUpperCase();
-  if(m==='H'){
-    let d=raw.replace(/\D/g,'')||raw;
-    if(/^0/.test(d) && d.length>4) d=String(Number(d));
-    return /^\d+$/.test(d)&&d.length<4?d.padStart(4,'0'):d;
-  }
-  if(m==='A') return raw.padStart(6,'0');
-  return raw;
+  const mm=normMarket(m);
+  if(mm==='H') return String(t||'').replace(/\D/g,'').padStart(5,'0');
+  if(mm==='A') return String(t||'').replace(/\D/g,'').padStart(6,'0');
+  return String(t||'').trim().toUpperCase();
 }
-function keyOf(s){return `${s.m}:${normTicker(s.t,s.m)}`}
-function dataOf(s){return P[keyOf(s)]||null}
+function hYahooCode(t){
+  const raw=String(t||'').replace(/\D/g,'').replace(/^0+/,'') || '0';
+  const n=Number(raw);
+  return Number.isFinite(n) && n<1000 ? raw.padStart(4,'0') : raw;
+}
+function displayTicker(s){return normTicker(s.t,s.m)}
+function legacyKeys(s){
+  const m=normMarket(s.m), t=normTicker(s.t,m), keys=[`${m}:${t}`];
+  if(m==='H') keys.push(`H:${hYahooCode(t)}`, `HK:${hYahooCode(t)}`);
+  return [...new Set(keys)];
+}
+function keyOf(s){return `${normMarket(s.m)}:${normTicker(s.t,s.m)}`}
+function dataOf(s){for(const k of legacyKeys(s)){ if(P[k]) return P[k]; } return null}
 function isNum(v){return typeof v==='number' && Number.isFinite(v)}
 function pct(v){return isNum(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'—'}
 function price(v){return isNum(v)?(Math.abs(v)>=1000?v.toFixed(0):v.toFixed(2)):'—'}
 function signClass(v){return !isNum(v)||Math.abs(v)<0.005?'flat':(v>0?'up':'down')}
 function toYfSym(t,m){
-  if(m==='US') return t;
-  if(m==='H') return `${normTicker(t,m)}.HK`;
-  if(String(t).startsWith('6')) return `${t}.SS`;
-  if(String(t).startsWith('8')||String(t).startsWith('4')) return `${t}.BJ`;
-  return `${t}.SZ`;
+  const mm=normMarket(m), tt=normTicker(t,mm);
+  if(mm==='US') return tt;
+  if(mm==='H') return `${hYahooCode(tt)}.HK`;
+  if(tt.startsWith('6')||tt.startsWith('9')) return `${tt}.SS`;
+  if(tt.startsWith('8')||tt.startsWith('4')) return `${tt}.BJ`;
+  return `${tt}.SZ`;
 }
 const US_EXCHANGE={
-  NVDA:'NASDAQ',AMD:'NASDAQ',AVGO:'NASDAQ',INTC:'NASDAQ',MRVL:'NASDAQ',ARM:'NASDAQ',QCOM:'NASDAQ',AMAT:'NASDAQ',LRCX:'NASDAQ',KLAC:'NASDAQ',CDNS:'NASDAQ',SNPS:'NASDAQ',TER:'NASDAQ',AEHR:'NASDAQ',ONTO:'NYSE',TSM:'NYSE',ASML:'NASDAQ',ASX:'NYSE',AMKR:'NASDAQ',MU:'NASDAQ',WDC:'NASDAQ',STX:'NASDAQ',SMCI:'NASDAQ',DELL:'NYSE',HPE:'NYSE',IBM:'NYSE',NTAP:'NASDAQ',ANET:'NYSE',CSCO:'NASDAQ',CIEN:'NYSE',JNPR:'NYSE',COHR:'NYSE',LITE:'NASDAQ',IPGP:'NASDAQ',VRT:'NYSE',MOD:'NYSE',CARR:'NYSE',TT:'NYSE',JCI:'NYSE',IR:'NYSE',EQIX:'NASDAQ',DLR:'NYSE',GDS:'NASDAQ',VNET:'NASDAQ',IRM:'NYSE',AMT:'NYSE',CCI:'NYSE',AMZN:'NASDAQ',MSFT:'NASDAQ',GOOGL:'NASDAQ',ORCL:'NYSE',META:'NASDAQ',PLTR:'NASDAQ',NET:'NYSE',AKAM:'NASDAQ',SNOW:'NYSE',DDOG:'NASDAQ',MDB:'NASDAQ',GTLB:'NASDAQ',ADBE:'NASDAQ',CGNX:'NASDAQ',MBLY:'NASDAQ',INTU:'NASDAQ',DOCU:'NASDAQ',BOX:'NYSE',DBX:'NASDAQ',TEAM:'NASDAQ',ASAN:'NYSE',BIDU:'NASDAQ',BABA:'NYSE',JD:'NASDAQ',PDD:'NASDAQ',NTES:'NASDAQ',TME:'NYSE',SHOP:'NYSE',CRM:'NYSE',NOW:'NYSE',VEEV:'NYSE',PATH:'NYSE',SOUN:'NASDAQ',ADSK:'NASDAQ',DUOL:'NASDAQ',AAPL:'NASDAQ',HPQ:'NYSE',TSLA:'NASDAQ',AMBA:'NASDAQ',MVIS:'NASDAQ',INVZ:'NASDAQ',HSAI:'NASDAQ',OUST:'NYSE',LAZR:'NASDAQ',AEVA:'NYSE',NXPI:'NASDAQ',TXN:'NASDAQ',ADI:'NASDAQ',ON:'NASDAQ',STM:'NYSE',MCHP:'NASDAQ',HON:'NASDAQ',TEL:'NYSE',ROK:'NYSE',AME:'NYSE',SYM:'NASDAQ',PH:'NYSE',IEX:'NYSE',ITW:'NYSE',DOV:'NYSE',EMR:'NYSE',ITT:'NYSE',FLS:'NYSE',XYL:'NYSE',PTC:'NASDAQ',U:'NYSE',RBLX:'NYSE',HXL:'NYSE',ATI:'NYSE',CRS:'NYSE',MP:'NYSE',QS:'NYSE',ENVX:'NASDAQ',FREY:'NYSE',ALB:'NYSE',LAC:'NYSE',MMM:'NYSE',GLW:'NYSE',DOW:'NYSE',DD:'NYSE',GEV:'NYSE',PWR:'NYSE',ABB:'NYSE',GNRC:'NYSE',CMI:'NYSE',NEE:'NYSE',DUK:'NYSE',SO:'NYSE',AEP:'NASDAQ',CEG:'NASDAQ',VST:'NYSE',TLN:'NASDAQ',EXC:'NASDAQ',PEG:'NYSE',ETN:'NYSE',HUBB:'NYSE',APH:'NYSE',JBL:'NYSE',FLEX:'NASDAQ',SANM:'NASDAQ',TTM:'NASDAQ'
+  NVDA:'NASDAQ',AMD:'NASDAQ',AVGO:'NASDAQ',INTC:'NASDAQ',MRVL:'NASDAQ',ARM:'NASDAQ',QCOM:'NASDAQ',AMAT:'NASDAQ',LRCX:'NASDAQ',KLAC:'NASDAQ',CDNS:'NASDAQ',SNPS:'NASDAQ',TER:'NASDAQ',AEHR:'NASDAQ',ONTO:'NYSE',TSM:'NYSE',ASML:'NASDAQ',ASX:'NYSE',AMKR:'NASDAQ',MU:'NASDAQ',WDC:'NASDAQ',STX:'NASDAQ',SMCI:'NASDAQ',DELL:'NYSE',HPE:'NYSE',IBM:'NYSE',NTAP:'NASDAQ',ANET:'NYSE',CSCO:'NASDAQ',CIEN:'NYSE',COHR:'NYSE',LITE:'NASDAQ',IPGP:'NASDAQ',VRT:'NYSE',MOD:'NYSE',CARR:'NYSE',TT:'NYSE',JCI:'NYSE',IR:'NYSE',EQIX:'NASDAQ',DLR:'NYSE',GDS:'NASDAQ',VNET:'NASDAQ',IRM:'NYSE',AMT:'NYSE',CCI:'NYSE',AMZN:'NASDAQ',MSFT:'NASDAQ',GOOGL:'NASDAQ',ORCL:'NYSE',META:'NASDAQ',PLTR:'NASDAQ',NET:'NYSE',AKAM:'NASDAQ',SNOW:'NYSE',DDOG:'NASDAQ',MDB:'NASDAQ',GTLB:'NASDAQ',ADBE:'NASDAQ',CGNX:'NASDAQ',MBLY:'NASDAQ',INTU:'NASDAQ',DOCU:'NASDAQ',BOX:'NYSE',DBX:'NASDAQ',TEAM:'NASDAQ',ASAN:'NYSE',BIDU:'NASDAQ',BABA:'NYSE',JD:'NASDAQ',PDD:'NASDAQ',NTES:'NASDAQ',TME:'NYSE',SHOP:'NYSE',CRM:'NYSE',NOW:'NYSE',VEEV:'NYSE',PATH:'NYSE',SOUN:'NASDAQ',ADSK:'NASDAQ',DUOL:'NASDAQ',AAPL:'NASDAQ',HPQ:'NYSE',TSLA:'NASDAQ',AMBA:'NASDAQ',MVIS:'NASDAQ',LIDR:'NASDAQ',INVZ:'NASDAQ',HSAI:'NASDAQ',OUST:'NYSE',LAZR:'NASDAQ',AEVA:'NYSE',NXPI:'NASDAQ',TXN:'NASDAQ',ADI:'NASDAQ',ON:'NASDAQ',STM:'NYSE',MCHP:'NASDAQ',HON:'NASDAQ',TEL:'NYSE',ROK:'NYSE',AME:'NYSE',SYM:'NASDAQ',PH:'NYSE',IEX:'NYSE',ITW:'NYSE',DOV:'NYSE',EMR:'NYSE',ITT:'NYSE',FLS:'NYSE',XYL:'NYSE',PTC:'NASDAQ',U:'NYSE',RBLX:'NYSE',HXL:'NYSE',ATI:'NYSE',CRS:'NYSE',MP:'NYSE',QS:'NYSE',ENVX:'NASDAQ',TE:'NYSE',ALB:'NYSE',LAC:'NYSE',MMM:'NYSE',GLW:'NYSE',DOW:'NYSE',DD:'NYSE',GEV:'NYSE',PWR:'NYSE',ABBNY:'OTC',GNRC:'NYSE',CMI:'NYSE',NEE:'NYSE',DUK:'NYSE',SO:'NYSE',AEP:'NASDAQ',CEG:'NASDAQ',VST:'NYSE',TLN:'NASDAQ',EXC:'NASDAQ',PEG:'NYSE',ETN:'NYSE',HUBB:'NYSE',APH:'NYSE',JBL:'NYSE',FLEX:'NASDAQ',SANM:'NASDAQ',TTMI:'NASDAQ'
 };
 function stockUrl(s){
   if(s.tv) return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s.tv)}`;
-  if(s.m==='H') return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent('HKEX:'+String(Number(s.t)))}`;
-  if(s.m==='A'){
-    const t=String(s.t).padStart(6,'0');
+  const m=normMarket(s.m), t=normTicker(s.t,m);
+  if(m==='H') return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent('HKEX:'+String(Number(t)))}`;
+  if(m==='A'){
     const ex=t.startsWith('6')||t.startsWith('9')?'SSE':(t.startsWith('8')||t.startsWith('4')?'BSE':'SZSE');
     return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex+':'+t)}`;
   }
-  const ex=US_EXCHANGE[s.t]||'';
-  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex?ex+':'+s.t:s.t)}`;
+  const ex=US_EXCHANGE[t]||'';
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex?ex+':'+t:t)}`;
 }
 
 function heatVars(chg){
@@ -269,7 +277,7 @@ function uniqueStocks(list){
 function passes(s,cat,lay){
   if(!activeMarkets.has(s.m)) return false;
   if(!query) return true;
-  const hay=`${s.t} ${s.n} ${s.m} ${cat?.n||''} ${lay?.l||''}`.toLowerCase();
+  const hay=`${displayTicker(s)} ${s.t} ${s.n} ${normMarket(s.m)} ${cat?.n||''} ${lay?.l||''}`.toLowerCase();
   return hay.includes(query);
 }
 function calcStats(stocks){
@@ -299,16 +307,17 @@ function sortedStocks(arr){
     if(isNum(ca)&&isNum(cb)) return cb-ca;
     if(isNum(ca)) return -1;
     if(isNum(cb)) return 1;
-    return a.t.localeCompare(b.t);
+    return displayTicker(a).localeCompare(displayTicker(b));
   });
 }
 
 function chip(s){
   const d=dataOf(s), ch=d?.change, has=isNum(ch);
   const cls=['chip',has?'':'no-data',d?.stale?'stale':''].filter(Boolean).join(' ');
-  const title=`${s.n} ${s.m}:${s.t}\n价格：${price(d?.price)} ${d?.currency||''}\n涨跌：${pct(ch)}${d?.stale?'\n使用上一轮有效行情':''}`;
+  const dt=displayTicker(s);
+  const title=`${s.n} ${normMarket(s.m)}:${dt}\n价格：${price(d?.price)} ${d?.currency||''}\n涨跌：${pct(ch)}${d?.stale?'\n使用上一轮有效行情':''}`;
   return `<a class="${cls}" style="${heatVars(ch)}" href="${stockUrl(s)}" target="_blank" rel="noopener" title="${title}">
-    <span class="chip-main"><b class="ticker">${s.t}</b><span class="name">${s.n}</span></span>
+    <span class="chip-main"><b class="ticker">${dt}</b><span class="name">${s.n}</span></span>
     <span class="price">${price(d?.price)}</span>
     <span class="change">${has?pct(ch):(d?.stale?'STALE':'—')}</span>
   </a>`;
