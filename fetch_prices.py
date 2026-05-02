@@ -62,9 +62,7 @@ def normalize_market(market: str) -> str:
 def normalize_ticker(ticker: str, market: str) -> str:
     ticker = str(ticker).strip().upper() if market == "US" else str(ticker).strip()
     if market == "H":
-        # Yahoo Finance 港股普通股使用 4 位代码（如 0700.HK、0100.HK、2513.HK）。
-        # HKEX/媒体有时会写成 5 位（如 02513.HK、00100.HK、09988.HK），这里统一转为 Yahoo 可识别格式，
-        # 同时 prices.json 的 key 也用同一套规范，避免新增港股有行情但前端匹配不到。
+
         digits = "".join(ch for ch in ticker if ch.isdigit()) or ticker
         if len(digits) > 4 and digits.startswith("0"):
             digits = digits.lstrip("0") or "0"
