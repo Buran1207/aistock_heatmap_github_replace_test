@@ -3,16 +3,22 @@ name: Update AI stock heatmap prices
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    # 覆盖 A/H 交易时段、欧股交叉时段和美股常规时段；GitHub 调度可能有数分钟延迟。
+    - cron: "*/5 * * * 1-6"
 
 permissions:
   contents: write
 
+concurrency:
+  group: update-prices
+  cancel-in-progress: true
+
 jobs:
   update-prices:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -28,8 +34,15 @@ jobs:
       - name: Fetch latest prices
         run: python fetch_prices.py
 
-      - name: Commit updated prices
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update prices.json"
-          file_pattern: prices.json
+      - name: Commit prices.json
+        run: |
+          if git diff --quiet -- prices.json; then
+            echo "prices.json unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prices.json
+          git commit -m "chore: update heatmap prices"
+          git push
+
