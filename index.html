@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>AI 股票产业链热力图</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --font-sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  --font-mono:"SF Mono","JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --radius-lg:18px;--radius-md:12px;--radius-sm:8px;--rail-w:248px;
+  --up:#ef4444;--up-strong:#b91c1c;--down:#22c55e;--down-strong:#15803d;--flat:#64748b;
+}
+:root,[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#070a12;--bg-soft:#0b1020;--panel:#101827;--panel-2:#111c2e;--panel-3:#17233a;
+  --line:rgba(148,163,184,.15);--line-strong:rgba(148,163,184,.28);
+  --text:#f7fafc;--text-2:#cbd5e1;--text-3:#8fa1b7;--muted:#64748b;
+  --shadow:0 24px 80px rgba(0,0,0,.42);--glow:0 0 0 1px rgba(255,255,255,.03),0 20px 60px rgba(0,0,0,.35);
+  --chip-fallback:#1f2937;--chip-fallback-bd:rgba(148,163,184,.28);--chip-fallback-fg:#9ca3af;
+  --topbar:rgba(7,10,18,.78);--rail:rgba(8,13,25,.88);
+  --accent:#60a5fa;--accent-2:#a78bfa;
+}
+[data-theme="light"]{
+  color-scheme:light;
+  --bg:#edf2f8;--bg-soft:#f6f8fc;--panel:#ffffff;--panel-2:#f8fafc;--panel-3:#eef4fb;
+  --line:rgba(15,23,42,.10);--line-strong:rgba(15,23,42,.20);
+  --text:#0f172a;--text-2:#334155;--text-3:#64748b;--muted:#94a3b8;
+  --shadow:0 22px 55px rgba(15,23,42,.10);--glow:0 0 0 1px rgba(15,23,42,.04),0 18px 42px rgba(15,23,42,.10);
+  --chip-fallback:#e5eaf2;--chip-fallback-bd:rgba(15,23,42,.14);--chip-fallback-fg:#475569;
+  --topbar:rgba(246,248,252,.82);--rail:rgba(255,255,255,.86);
+  --accent:#2563eb;--accent-2:#7c3aed;
+}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{margin:0;min-height:100vh;background:
+  radial-gradient(circle at 15% 10%,rgba(96,165,250,.18),transparent 26rem),
+  radial-gradient(circle at 82% 12%,rgba(167,139,250,.12),transparent 24rem),
+  linear-gradient(180deg,var(--bg),var(--bg-soft));color:var(--text);font-family:var(--font-sans);font-size:13px}
+button,input{font:inherit}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:rgba(148,163,184,.26);border-radius:999px;border:2px solid transparent;background-clip:content-box}
+.app{display:flex;min-height:100vh}
+.rail{width:var(--rail-w);position:sticky;top:0;height:100vh;overflow:auto;flex-shrink:0;background:var(--rail);backdrop-filter:blur(18px);border-right:1px solid var(--line);padding:22px 18px}
+.brand{padding:4px 2px 18px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.brand-kicker{font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;font-weight:800}
+.brand h1{font-size:20px;line-height:1.15;margin:8px 0 7px;font-weight:850;letter-spacing:-.02em}
+.brand p{margin:0;color:var(--text-3);font-size:12px;line-height:1.65}
+.rail-status{display:inline-flex;align-items:center;gap:6px;margin-top:11px;font-family:var(--font-mono);font-size:10px;color:var(--text-2);background:var(--panel-3);border:1px solid var(--line);border-radius:999px;padding:5px 9px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--flat);box-shadow:0 0 0 3px rgba(100,116,139,.15)}
+.pulse.live{background:var(--up);box-shadow:0 0 0 3px rgba(239,68,68,.16)}
+.rail-edge{font-family:var(--font-mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-3);padding:8px 2px}
+.rail-chain{position:relative;padding:8px 0 12px 4px}
+.rail-chain::before{content:"";position:absolute;left:10px;top:12px;bottom:16px;width:1px;background:linear-gradient(180deg,#f59e0b,#a855f7,#3b82f6,#14b8a6,#f97316,#22c55e,#ec4899,#ef4444,#8b5cf6,#0ea5e9);opacity:.34}
+.rail-item{display:grid;grid-template-columns:20px 1fr;gap:9px;align-items:start;padding:7px 0;position:relative;color:var(--text-3)}
+.rail-dot{width:11px;height:11px;border-radius:50%;margin-top:4px;background:var(--panel);border:2px solid currentColor;position:relative;z-index:1;transition:.18s ease}
+.rail-item:hover,.rail-item.active{color:var(--text)}
+.rail-item:hover .rail-dot,.rail-item.active .rail-dot{transform:scale(1.42);box-shadow:0 0 18px currentColor}
+.rail-label{font-size:12px;font-weight:700;line-height:1.35}
+.rail-meta{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px}
+.main{flex:1;min-width:0}
+.topbar{position:sticky;top:0;z-index:20;background:var(--topbar);backdrop-filter:blur(20px);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.title-badge{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;font-weight:900;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:999px;padding:6px 10px}
+.sep{width:1px;height:24px;background:var(--line-strong);margin:0 2px}
+.mkt-btn,.tool-btn{border:1px solid var(--line-strong);background:var(--panel);color:var(--text-2);border-radius:999px;padding:7px 11px;cursor:pointer;font-family:var(--font-mono);font-size:11px;font-weight:800;letter-spacing:.05em;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+.mkt-btn{display:inline-flex;gap:6px;align-items:center}
+.mkt-btn::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.mkt-btn[data-market="US"]{color:#60a5fa}
+.mkt-btn[data-market="H"]{color:#a78bfa}
+.mkt-btn[data-market="A"]{color:#f97316}
+.mkt-btn.off{opacity:.34;filter:grayscale(.5)}
+.tool-btn:hover,.mkt-btn:hover{transform:translateY(-1px);box-shadow:var(--glow)}
+.search{width:min(280px,32vw);min-width:160px;border:1px solid var(--line-strong);background:var(--panel);color:var(--text);border-radius:999px;padding:8px 13px;outline:none}
+.search:focus{border-color:color-mix(in srgb,var(--accent) 65%,var(--line-strong));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent)}
+.spacer{flex:1}
+.upd{display:flex;gap:8px;align-items:center;color:var(--text-3);font-family:var(--font-mono);font-size:11px;white-space:nowrap}
+.live-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;border:1px solid var(--line);background:var(--panel);font-weight:900}
+.live-pill.live{color:var(--up);border-color:rgba(239,68,68,.32);background:rgba(239,68,68,.10)}
+.live-pill.warn{color:#f59e0b;border-color:rgba(245,158,11,.32);background:rgba(245,158,11,.10)}
+.live-pill.error{color:var(--text-3)}
+.content{padding:22px 24px 64px}
+.overview{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+.stat-card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat-card::after{content:"";position:absolute;inset:auto -30% -50% auto;width:180px;height:180px;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 14%,transparent),transparent 62%);pointer-events:none}
+.stat-top{display:flex;justify-content:space-between;gap:12px;align-items:start;color:var(--text-3);font-family:var(--font-mono);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.stat-value{font-size:30px;line-height:1;margin:11px 0 8px;font-weight:900;letter-spacing:-.04em}
+.stat-sub{display:flex;gap:10px;flex-wrap:wrap;color:var(--text-3);font-size:12px}
+.stat-sub b{color:var(--text)}
+.dist{height:8px;border-radius:999px;background:var(--panel-3);overflow:hidden;display:flex;margin-top:13px;border:1px solid var(--line)}
+.dist i{display:block;min-width:0}
+.dist .up{background:linear-gradient(90deg,#fb7185,var(--up))}
+.dist .down{background:linear-gradient(90deg,#4ade80,var(--down))}
+.dist .flat{background:var(--flat)}
+.dist .na{background:repeating-linear-gradient(45deg,rgba(148,163,184,.20),rgba(148,163,184,.20) 3px,rgba(148,163,184,.07) 3px,rgba(148,163,184,.07) 6px)}
+.legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--text-3);font-size:12px;margin:4px 0 18px 2px}
+.legend span{display:inline-flex;gap:5px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend .lg-up{background:var(--up)}.legend .lg-down{background:var(--down)}.legend .lg-na{background:var(--chip-fallback)}
+.layer{border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;background:color-mix(in srgb,var(--panel) 92%,transparent);box-shadow:var(--shadow);margin-bottom:16px}
+.layer-head{display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;padding:16px 18px;border-left:5px solid var(--lc);border-bottom:1px solid var(--line);cursor:pointer;background:linear-gradient(90deg,color-mix(in srgb,var(--lc) 11%,transparent),transparent 62%)}
+.layer-num{font-family:var(--font-mono);font-weight:900;color:var(--lc);background:color-mix(in srgb,var(--lc) 13%,transparent);border:1px solid color-mix(in srgb,var(--lc) 32%,transparent);border-radius:10px;padding:7px 9px}
+.layer-title{min-width:0}
+.layer-title h2{font-size:17px;margin:0 0 3px;letter-spacing:-.01em}
+.layer-title p{margin:0;color:var(--text-3);font-size:12px}
+.layer-metrics{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.badge{font-family:var(--font-mono);font-weight:900;font-size:10px;border-radius:999px;padding:5px 8px;border:1px solid var(--line);background:var(--panel);color:var(--text-2)}
+.badge.up{color:var(--up);border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.09)}
+.badge.down{color:var(--down);border-color:rgba(34,197,94,.28);background:rgba(34,197,94,.09)}
+.chev{font-size:16px;color:var(--text-3);transition:.16s}
+.layer.closed .chev{transform:rotate(-90deg)}
+.layer-body{padding:16px 18px 18px}
+.layer.closed .layer-body{display:none}
+.cat{border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;margin-bottom:12px}
+.cat:last-child{margin-bottom:0}
+.cat-head{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:12px 14px;background:linear-gradient(90deg,color-mix(in srgb,var(--lc) 8%,transparent),transparent);border-bottom:1px solid var(--line)}
+.cat-title{display:flex;align-items:center;gap:9px;min-width:0}
+.cat-dot{width:9px;height:9px;border-radius:50%;background:var(--lc);box-shadow:0 0 18px color-mix(in srgb,var(--lc) 55%,transparent)}
+.cat-name{font-weight:850;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-score{display:flex;align-items:center;gap:8px;justify-content:flex-end;min-width:260px}
+.avg{font-family:var(--font-mono);font-weight:900;font-size:12px;padding:5px 8px;border-radius:999px}
+.avg.up{color:var(--up);background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.25)}
+.avg.down{color:var(--down);background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.25)}
+.avg.flat{color:var(--text-3);background:var(--panel-3);border:1px solid var(--line)}
+.market-row{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:10px 14px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.market-row:first-child{border-top:0}
+.market-tag{font-family:var(--font-mono);font-weight:950;letter-spacing:.08em;font-size:11px;align-self:start;display:inline-flex;justify-content:center;align-items:center;border-radius:10px;padding:7px 0;background:var(--panel-3);border:1px solid var(--line);color:var(--text-2)}
+.market-tag.US{color:#60a5fa}.market-tag.H{color:#a78bfa}.market-tag.A{color:#f97316}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.chip{display:inline-grid;grid-template-columns:auto auto auto;align-items:center;overflow:hidden;border-radius:10px;border:1px solid var(--heat-bd,var(--chip-fallback-bd));background:var(--heat-bg,var(--chip-fallback));color:var(--heat-fg,var(--chip-fallback-fg));box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:transform .12s ease,box-shadow .12s ease,filter .12s ease}
+.chip:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(0,0,0,.20),0 0 0 1px color-mix(in srgb,var(--heat-fg,var(--accent)) 22%,transparent)}
+.chip-main{display:flex;gap:5px;align-items:baseline;padding:7px 8px 7px 9px;min-width:0}
+.ticker{font-family:var(--font-mono);font-weight:950;font-size:11px;letter-spacing:.02em}
+.name{font-size:11px;font-weight:750;opacity:.96;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.price{font-family:var(--font-mono);font-size:10px;font-weight:800;opacity:.92;padding-right:7px}
+.change{height:100%;display:flex;align-items:center;font-family:var(--font-mono);font-weight:950;font-size:10px;padding:0 8px;background:rgba(0,0,0,.16);border-left:1px solid rgba(255,255,255,.14)}
+[data-theme="light"] .change{background:rgba(255,255,255,.22);border-left:1px solid rgba(255,255,255,.38)}
+.chip.no-data{--heat-bg:var(--chip-fallback);--heat-bd:var(--chip-fallback-bd);--heat-fg:var(--chip-fallback-fg)}
+.chip.stale{filter:saturate(.72)}
+.empty{padding:42px 18px;color:var(--text-3);text-align:center;border:1px dashed var(--line-strong);border-radius:var(--radius-lg);background:var(--panel)}
+.help{display:none;margin:0 24px 18px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--text-2);line-height:1.8}
+.help code{font-family:var(--font-mono);background:var(--panel-3);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--accent)}
+.err{color:#fca5a5}
+@media(max-width:1180px){.overview{grid-template-columns:repeat(2,minmax(0,1fr))}.cat-score{min-width:190px}}
+@media(max-width:860px){.rail{display:none}.topbar{padding:10px 12px}.content{padding:14px 12px 46px}.overview{grid-template-columns:1fr}.layer-head{grid-template-columns:auto 1fr auto}.layer-metrics{grid-column:1/-1;justify-content:flex-start}.cat-head{grid-template-columns:1fr}.cat-score{min-width:0;justify-content:flex-start}.market-row{grid-template-columns:44px 1fr}.name{max-width:82px}.search{width:100%;order:8}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-kicker">AI STOCK HEATMAP</div>
+      <h1>AI 产业链<br>三市场热力图</h1>
+      <p>US / H / A 统一股票池，盘中由 <code>prices.json</code> 自动刷新。</p>
+      <div class="rail-status"><i class="pulse" id="rail-pulse"></i><span id="rail-upd">等待行情</span></div>
+    </div>
+    <div class="rail-edge">↑ Upstream</div>
+    <nav class="rail-chain" id="rail-chain"></nav>
+    <div class="rail-edge">↓ Downstream</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <span class="title-badge">HEAT MAP</span>
+      <button class="mkt-btn" data-market="US" id="btn-US" onclick="toggleMarket('US')">US</button>
+      <button class="mkt-btn" data-market="H" id="btn-H" onclick="toggleMarket('H')">H</button>
+      <button class="mkt-btn" data-market="A" id="btn-A" onclick="toggleMarket('A')">A</button>
+      <span class="sep"></span>
+      <input class="search" id="search" placeholder="搜索 ticker / 公司 / 赛道…" oninput="onSearch()" />
+      <button class="tool-btn" onclick="toggleAll(true)">全展开</button>
+      <button class="tool-btn" onclick="toggleAll(false)">全收起</button>
+      <button class="tool-btn" onclick="toggleHelp()">说明</button>
+      <button class="tool-btn" onclick="toggleTheme()" id="theme-btn" title="切换亮/暗模式">☀︎</button>
+      <span class="spacer"></span>
+      <span class="upd"><span class="live-pill error" id="live-pill">WAIT</span><span id="updated-at">未加载</span></span>
+    </div>
+
+    <section class="help" id="help">
+      <b>更新机制：</b>GitHub Actions 定时运行 <code>python fetch_prices.py</code>，去重抓取股票池后写入 <code>prices.json</code>；前端每 30 秒轮询该文件，所以 GitHub Pages 不再直接跨域请求行情接口。<br>
+      <b>颜色约定：</b>红色 = 上涨，绿色 = 下跌，灰色 = 暂无任何可用行情；脚本会保留上一轮有效价格，临时抓取失败不会立刻变灰。<br>
+      <b>股票池：</b>只维护 <code>universe.json</code>，同一股票可以出现在多个细分环节，但抓取脚本会按 <code>市场:代码</code> 自动去重。
+    </section>
+
+    <section class="content">
+      <div class="overview" id="overview"></div>
+      <div class="legend">
+        <span><i class="lg-up"></i>上涨 / 涨幅越大越深</span>
+        <span><i class="lg-down"></i>下跌 / 跌幅越大越深</span>
+        <span><i class="lg-na"></i>暂无行情</span>
+        <span id="universe-count"></span>
+      </div>
+      <div id="wrap"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const MARKET_ORDER=['US','H','A'];
+const MARKET_NAME={US:'US',H:'H',A:'A'};
+let C=[], P={}, activeMarkets=new Set(MARKET_ORDER), query='', refreshTimer=null;
+
+function qs(id){return document.getElementById(id)}
+function keyOf(s){return `${s.m}:${s.t}`}
+function dataOf(s){return P[keyOf(s)]||null}
+function isNum(v){return typeof v==='number' && Number.isFinite(v)}
+function pct(v){return isNum(v)?`${v>0?'+':''}${v.toFixed(2)}%`:'—'}
+function price(v){return isNum(v)?(Math.abs(v)>=1000?v.toFixed(0):v.toFixed(2)):'—'}
+function signClass(v){return !isNum(v)||Math.abs(v)<0.005?'flat':(v>0?'up':'down')}
+function toYfSym(t,m){
+  if(m==='US') return t;
+  if(m==='H') return `${String(t).padStart(4,'0')}.HK`;
+  if(String(t).startsWith('6')) return `${t}.SS`;
+  if(String(t).startsWith('8')||String(t).startsWith('4')) return `${t}.BJ`;
+  return `${t}.SZ`;
+}
+const US_EXCHANGE={
+  NVDA:'NASDAQ',AMD:'NASDAQ',AVGO:'NASDAQ',INTC:'NASDAQ',MRVL:'NASDAQ',ARM:'NASDAQ',QCOM:'NASDAQ',AMAT:'NASDAQ',LRCX:'NASDAQ',KLAC:'NASDAQ',CDNS:'NASDAQ',SNPS:'NASDAQ',TER:'NASDAQ',AEHR:'NASDAQ',ONTO:'NYSE',TSM:'NYSE',ASML:'NASDAQ',ASX:'NYSE',AMKR:'NASDAQ',MU:'NASDAQ',WDC:'NASDAQ',STX:'NASDAQ',SMCI:'NASDAQ',DELL:'NYSE',HPE:'NYSE',IBM:'NYSE',NTAP:'NASDAQ',ANET:'NYSE',CSCO:'NASDAQ',CIEN:'NYSE',JNPR:'NYSE',COHR:'NYSE',LITE:'NASDAQ',IPGP:'NASDAQ',VRT:'NYSE',MOD:'NYSE',CARR:'NYSE',TT:'NYSE',JCI:'NYSE',IR:'NYSE',EQIX:'NASDAQ',DLR:'NYSE',GDS:'NASDAQ',VNET:'NASDAQ',IRM:'NYSE',AMT:'NYSE',CCI:'NYSE',AMZN:'NASDAQ',MSFT:'NASDAQ',GOOGL:'NASDAQ',ORCL:'NYSE',META:'NASDAQ',PLTR:'NASDAQ',NET:'NYSE',AKAM:'NASDAQ',SNOW:'NYSE',DDOG:'NASDAQ',MDB:'NASDAQ',GTLB:'NASDAQ',ADBE:'NASDAQ',CGNX:'NASDAQ',MBLY:'NASDAQ',INTU:'NASDAQ',DOCU:'NASDAQ',BOX:'NYSE',DBX:'NASDAQ',TEAM:'NASDAQ',ASAN:'NYSE',BIDU:'NASDAQ',BABA:'NYSE',JD:'NASDAQ',PDD:'NASDAQ',NTES:'NASDAQ',TME:'NYSE',SHOP:'NYSE',CRM:'NYSE',NOW:'NYSE',VEEV:'NYSE',PATH:'NYSE',SOUN:'NASDAQ',ADSK:'NASDAQ',DUOL:'NASDAQ',AAPL:'NASDAQ',HPQ:'NYSE',TSLA:'NASDAQ',AMBA:'NASDAQ',MVIS:'NASDAQ',INVZ:'NASDAQ',HSAI:'NASDAQ',OUST:'NYSE',LAZR:'NASDAQ',AEVA:'NYSE',NXPI:'NASDAQ',TXN:'NASDAQ',ADI:'NASDAQ',ON:'NASDAQ',STM:'NYSE',MCHP:'NASDAQ',HON:'NASDAQ',TEL:'NYSE',ROK:'NYSE',AME:'NYSE',SYM:'NASDAQ',PH:'NYSE',IEX:'NYSE',ITW:'NYSE',DOV:'NYSE',EMR:'NYSE',ITT:'NYSE',FLS:'NYSE',XYL:'NYSE',PTC:'NASDAQ',U:'NYSE',RBLX:'NYSE',HXL:'NYSE',ATI:'NYSE',CRS:'NYSE',MP:'NYSE',QS:'NYSE',ENVX:'NASDAQ',FREY:'NYSE',ALB:'NYSE',LAC:'NYSE',MMM:'NYSE',GLW:'NYSE',DOW:'NYSE',DD:'NYSE',GEV:'NYSE',PWR:'NYSE',ABB:'NYSE',GNRC:'NYSE',CMI:'NYSE',NEE:'NYSE',DUK:'NYSE',SO:'NYSE',AEP:'NASDAQ',CEG:'NASDAQ',VST:'NYSE',TLN:'NASDAQ',EXC:'NASDAQ',PEG:'NYSE',ETN:'NYSE',HUBB:'NYSE',APH:'NYSE',JBL:'NYSE',FLEX:'NASDAQ',SANM:'NASDAQ',TTM:'NASDAQ'
+};
+function stockUrl(s){
+  if(s.tv) return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s.tv)}`;
+  if(s.m==='H') return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent('HKEX:'+String(Number(s.t)))}`;
+  if(s.m==='A'){
+    const t=String(s.t).padStart(6,'0');
+    const ex=t.startsWith('6')||t.startsWith('9')?'SSE':(t.startsWith('8')||t.startsWith('4')?'BSE':'SZSE');
+    return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex+':'+t)}`;
+  }
+  const ex=US_EXCHANGE[s.t]||'';
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex?ex+':'+s.t:s.t)}`;
+}
+
+function heatVars(chg){
+  if(!isNum(chg)) return '';
+  const up=chg>=0;
+  const a=Math.min(Math.abs(chg)/8,1);
+  const light=document.documentElement.getAttribute('data-theme')==='light';
+  const rgb=up?'239,68,68':'34,197,94';
+  const fg=light
+    ? (a>.36?'#fff':(up?'#7f1d1d':'#14532d'))
+    : (a>.34?'#fff':(up?'#fecaca':'#bbf7d0'));
+  const bg=light ? (0.12+a*.72) : (0.18+a*.70);
+  const bd=light ? (0.22+a*.44) : (0.26+a*.42);
+  return `--heat-bg:rgba(${rgb},${bg.toFixed(3)});--heat-bd:rgba(${rgb},${bd.toFixed(3)});--heat-fg:${fg}`;
+}
+
+function allStocks({visibleOnly=false}={}){
+  const list=[];
+  C.forEach(l=>l.cat.forEach(c=>c.s.forEach(s=>{
+    if(visibleOnly && !passes(s,c,l)) return;
+    list.push({...s, cat:c.n, layer:l.l});
+  })));
+  return list;
+}
+function uniqueStocks(list){
+  const seen=new Map();
+  list.forEach(s=>{if(!seen.has(keyOf(s))) seen.set(keyOf(s),s)});
+  return [...seen.values()];
+}
+function passes(s,cat,lay){
+  if(!activeMarkets.has(s.m)) return false;
+  if(!query) return true;
+  const hay=`${s.t} ${s.n} ${s.m} ${cat?.n||''} ${lay?.l||''}`.toLowerCase();
+  return hay.includes(query);
+}
+function calcStats(stocks){
+  let up=0,down=0,flat=0,na=0,sum=0,n=0;
+  stocks.forEach(s=>{
+    const d=dataOf(s), ch=d?.change;
+    if(!isNum(ch)){na++; return}
+    n++; sum+=ch;
+    if(ch>0.005) up++; else if(ch<-0.005) down++; else flat++;
+  });
+  return {total:stocks.length,up,down,flat,na,valid:n,avg:n?sum/n:null};
+}
+function distHtml(st){
+  const total=Math.max(st.total,1);
+  const w=k=>`${Math.max(0,st[k]/total*100).toFixed(3)}%`;
+  return `<div class="dist" title="涨 ${st.up} / 跌 ${st.down} / 平 ${st.flat} / 无 ${st.na}">
+    <i class="up" style="width:${w('up')}"></i><i class="flat" style="width:${w('flat')}"></i><i class="down" style="width:${w('down')}"></i><i class="na" style="width:${w('na')}"></i>
+  </div>`;
+}
+function avgBadge(st){
+  const c=signClass(st.avg);
+  return `<span class="avg ${c}">${pct(st.avg)}</span>`;
+}
+function sortedStocks(arr){
+  return [...arr].sort((a,b)=>{
+    const da=dataOf(a), db=dataOf(b), ca=da?.change, cb=db?.change;
+    if(isNum(ca)&&isNum(cb)) return cb-ca;
+    if(isNum(ca)) return -1;
+    if(isNum(cb)) return 1;
+    return a.t.localeCompare(b.t);
+  });
+}
+
+function chip(s){
+  const d=dataOf(s), ch=d?.change, has=isNum(ch);
+  const cls=['chip',has?'':'no-data',d?.stale?'stale':''].filter(Boolean).join(' ');
+  const title=`${s.n} ${s.m}:${s.t}\n价格：${price(d?.price)} ${d?.currency||''}\n涨跌：${pct(ch)}${d?.stale?'\n使用上一轮有效行情':''}`;
+  return `<a class="${cls}" style="${heatVars(ch)}" href="${stockUrl(s)}" target="_blank" rel="noopener" title="${title}">
+    <span class="chip-main"><b class="ticker">${s.t}</b><span class="name">${s.n}</span></span>
+    <span class="price">${price(d?.price)}</span>
+    <span class="change">${has?pct(ch):(d?.stale?'STALE':'—')}</span>
+  </a>`;
+}
+
+function buildOverview(){
+  const visibleUnique=uniqueStocks(allStocks({visibleOnly:true}));
+  const allUnique=uniqueStocks(allStocks());
+  const cards=[];
+  const allStats=calcStats(visibleUnique);
+  cards.push(`<div class="stat-card"><div class="stat-top"><span>ALL MARKETS</span><span>${pct(allStats.avg)}</span></div><div class="stat-value">${allStats.total}</div><div class="stat-sub"><span>涨 <b>${allStats.up}</b></span><span>跌 <b>${allStats.down}</b></span><span>无 <b>${allStats.na}</b></span></div>${distHtml(allStats)}</div>`);
+  MARKET_ORDER.forEach(m=>{
+    const ss=visibleUnique.filter(s=>s.m===m);
+    const st=calcStats(ss);
+    cards.push(`<div class="stat-card"><div class="stat-top"><span>${MARKET_NAME[m]} MARKET</span><span>${pct(st.avg)}</span></div><div class="stat-value">${st.valid}<small style="font-size:14px;color:var(--text-3)">/${st.total}</small></div><div class="stat-sub"><span>涨 <b>${st.up}</b></span><span>跌 <b>${st.down}</b></span><span>无 <b>${st.na}</b></span></div>${distHtml(st)}</div>`);
+  });
+  qs('overview').innerHTML=cards.join('');
+  const counts=MARKET_ORDER.map(m=>`${m} ${allUnique.filter(s=>s.m===m).length}`).join(' · ');
+  qs('universe-count').textContent=`股票池去重 ${allUnique.length} 支（${counts}）`;
+}
+
+function buildRail(){
+  qs('rail-chain').innerHTML=C.map((l,i)=>{
+    const total=uniqueStocks(l.cat.flatMap(c=>c.s)).length;
+    return `<a class="rail-item" href="#layer-${i}" style="color:${l.c}">
+      <i class="rail-dot"></i><span><div class="rail-label">${l.num} ${l.l}</div><div class="rail-meta">${total} unique</div></span>
+    </a>`;
+  }).join('');
+}
+
+function catHtml(cat,lay){
+  const rows=MARKET_ORDER.map(m=>{
+    const ss=sortedStocks(cat.s.filter(s=>s.m===m && passes(s,cat,lay)));
+    if(!ss.length) return '';
+    return `<div class="market-row"><span class="market-tag ${m}">${MARKET_NAME[m]}</span><div class="chips">${ss.map(chip).join('')}</div></div>`;
+  }).join('');
+  if(!rows) return '';
+  const st=calcStats(cat.s.filter(s=>activeMarkets.has(s.m) && (!query || passes(s,cat,lay))));
+  return `<section class="cat">
+    <header class="cat-head">
+      <div class="cat-title"><i class="cat-dot"></i><span class="cat-name">${cat.n}</span></div>
+      <div class="cat-score">${avgBadge(st)}<span class="badge up">涨 ${st.up}</span><span class="badge down">跌 ${st.down}</span><span class="badge">无 ${st.na}</span></div>
+      <div style="grid-column:1/-1">${distHtml(st)}</div>
+    </header>
+    ${rows}
+  </section>`;
+}
+
+function render(){
+  buildOverview();
+  const wrap=qs('wrap');
+  const html=[];
+  C.forEach((lay,i)=>{
+    const cats=lay.cat.map(c=>catHtml(c,lay)).filter(Boolean);
+    if(!cats.length) return;
+    const layerStocks=lay.cat.flatMap(c=>c.s.filter(s=>activeMarkets.has(s.m) && (!query || passes(s,c,lay))));
+    const st=calcStats(layerStocks);
+    const marketBadges=MARKET_ORDER.map(m=>{
+      const c=layerStocks.filter(s=>s.m===m).length;
+      return c?`<span class="badge">${m} ${c}</span>`:'';
+    }).join('');
+    html.push(`<section class="layer" id="layer-${i}" style="--lc:${lay.c}">
+      <header class="layer-head" onclick="toggleLayer(${i})">
+        <span class="layer-num">${lay.num}</span>
+        <div class="layer-title"><h2>${lay.l}</h2><p>${lay.sub||'AI supply-chain segment'} · ${st.valid}/${st.total} 有行情 · 均值 ${pct(st.avg)}</p></div>
+        <div class="layer-metrics">${marketBadges}<span class="badge up">涨 ${st.up}</span><span class="badge down">跌 ${st.down}</span></div>
+        <span class="chev">▾</span>
+      </header>
+      <div class="layer-body">${cats.join('')}</div>
+    </section>`);
+  });
+  wrap.innerHTML=html.join('') || `<div class="empty">没有匹配结果。换个关键词，或打开更多市场。</div>`;
+  observeRail();
+}
+
+function toggleLayer(i){qs(`layer-${i}`)?.classList.toggle('closed')}
+function toggleAll(open){document.querySelectorAll('.layer').forEach(el=>el.classList.toggle('closed',!open))}
+function toggleMarket(m){activeMarkets.has(m)?activeMarkets.delete(m):activeMarkets.add(m);qs(`btn-${m}`).classList.toggle('off',!activeMarkets.has(m));render()}
+function onSearch(){query=qs('search').value.trim().toLowerCase();render()}
+function toggleHelp(){const el=qs('help');el.style.display=el.style.display==='block'?'none':'block'}
+function toggleTheme(){
+  const html=document.documentElement;
+  const next=html.getAttribute('data-theme')==='dark'?'light':'dark';
+  html.setAttribute('data-theme',next);localStorage.setItem('theme',next);
+  qs('theme-btn').textContent=next==='dark'?'☀︎':'🌙';
+  render();
+}
+
+let io=null;
+function observeRail(){
+  if(io) io.disconnect();
+  const items=[...document.querySelectorAll('.rail-item')];
+  io=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      const idx=en.target.id.replace('layer-','');
+      items.forEach((it,i)=>it.classList.toggle('active',String(i)===idx));
+    });
+  },{rootMargin:'-20% 0px -70% 0px',threshold:.01});
+  document.querySelectorAll('.layer').forEach(el=>io.observe(el));
+}
+
+function setStatus(kind,text){
+  const pill=qs('live-pill'), pulse=qs('rail-pulse');
+  pill.className=`live-pill ${kind}`;
+  pill.textContent=kind==='live'?'LIVE':kind==='warn'?'STALE':'WAIT';
+  pulse.className=`pulse ${kind==='live'?'live':''}`;
+  qs('updated-at').textContent=text;
+  qs('rail-upd').textContent=text;
+}
+async function loadUniverse(){
+  const r=await fetch(`universe.json?ts=${Date.now()}`);
+  if(!r.ok) throw new Error(`universe ${r.status}`);
+  const u=await r.json();
+  C=u.layers||u;
+}
+async function loadPrices(){
+  try{
+    const r=await fetch(`prices.json?ts=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j=await r.json();
+    P=j.prices||{};
+    const valid=Object.values(P).filter(x=>isNum(x?.price)&&isNum(x?.change)).length;
+    const txt=`${j.generated_at||'已加载'} · ${valid} quotes`;
+    setStatus(valid?'live':'warn',txt);
+    render();
+  }catch(e){
+    setStatus('error','行情文件未就绪');
+    console.warn('prices load failed',e);
+  }
+}
+async function init(){
+  const saved=localStorage.getItem('theme')||'dark';
+  document.documentElement.setAttribute('data-theme',saved);
+  qs('theme-btn').textContent=saved==='dark'?'☀︎':'🌙';
+  try{
+    await loadUniverse();
+    buildRail();
+    render();
+    await loadPrices();
+    refreshTimer=setInterval(loadPrices,30000);
+  }catch(e){
+    qs('wrap').innerHTML=`<div class="empty err">初始化失败：${e.message}</div>`;
+    setStatus('error','初始化失败');
+  }
+}
+init();
+</script>
+</body>
+</html>
